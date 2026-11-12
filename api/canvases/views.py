@@ -84,6 +84,22 @@ class NodeDetailView(APIView):
 
         return Response(response_data, status=status.HTTP_200_OK)
 
+    async def delete(self, request, canvasId, nodeId):
+        try:
+            canvas = await sync_to_async(Canvas.objects.get)(pk=canvasId)
+        except Canvas.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            node = await sync_to_async(Node.objects.get)(pk=nodeId, canvas=canvas)
+        except Node.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        await sync_to_async(node.delete)()
+        await sync_to_async(cache.delete)(f'canvas_graph_{canvasId}')
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 class EdgeDetailView(APIView):
     async def put(self, request, canvasId, edgeId):
         try:
@@ -110,3 +126,19 @@ class EdgeDetailView(APIView):
         await sync_to_async(cache.delete)(f'canvas_graph_{canvasId}')
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+    async def delete(self, request, canvasId, edgeId):
+        try:
+            canvas = await sync_to_async(Canvas.objects.get)(pk=canvasId)
+        except Canvas.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            edge = await sync_to_async(Edge.objects.get)(pk=edgeId, source__canvas=canvas)
+        except Edge.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        await sync_to_async(edge.delete)()
+        await sync_to_async(cache.delete)(f'canvas_graph_{canvasId}')
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
