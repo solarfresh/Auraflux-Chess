@@ -47,3 +47,33 @@ def mock_semaphore():
 def canvas(db):
     canvas = Canvas.objects.create(title="Test Canvas")
     return canvas
+
+
+class MockModelManager:
+    def __init__(self, instance=None, raise_does_not_exist=False):
+        self.instance = instance
+        self.raise_does_not_exist = raise_does_not_exist
+
+    def get(self, **kwargs):
+        if self.raise_does_not_exist:
+            raise Exception("Not found")
+        return self.instance
+
+
+class MockModel:
+    class DoesNotExist(Exception):
+        pass
+
+
+@pytest.fixture
+def mock_model_manager_factory():
+    def _factory(instance=None, raise_does_not_exist=False):
+        return MockModelManager(instance=instance, raise_does_not_exist=raise_does_not_exist)
+    return _factory
+
+
+@pytest.fixture
+def mock_model_instance():
+    instance = MagicMock()
+    instance.pk = 1
+    return instance
