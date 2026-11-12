@@ -1,9 +1,10 @@
+from adrf.views import APIView
 from asgiref.sync import sync_to_async
+from core.utils import get_serialized_data_by_id
 from django.core.cache import cache
-from django.shortcuts import get_object_or_404
+from django.http import Http404
 from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from .models import Canvas
 from .serializers import CanvasGraphSerializer
@@ -16,15 +17,16 @@ class CanvasGraphAPIView(APIView):
 
         if not data:
             try:
-                canvas = await sync_to_async(get_object_or_404)(
-                    Canvas.objects.prefetch_related('nodes', 'edges'),
-                    pk=canvasId
+                data = await sync_to_async(get_serialized_data_by_id)(
+                    id=canvasId,
+                    model_class=Canvas,
+                    serializer_class=CanvasGraphSerializer,
+                    prefetch_related=['nodes', 'edges']
                 )
-                # Ensure serialization is also run in a thread to keep it async-friendly
-                serializer = await sync_to_async(CanvasGraphSerializer)(canvas)
-                data = serializer.data
                 await sync_to_async(cache.set)(cache_key, data, 60 * 15)
-            except Exception:
+            except Http404:
+                return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+            except Canvas.DoesNotExist:
                 return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(data)

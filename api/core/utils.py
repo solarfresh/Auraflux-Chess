@@ -41,8 +41,20 @@ def get_serialized_data(
     serializer = serializer_class(instances, many=many)
     return serializer.data
 
-def get_serialized_data_by_id(id: UUID, model_class, serializer_class):
-    instance = model_class.objects.get(id=id)
+def get_serialized_data_by_id(
+    id: UUID,
+    model_class,
+    serializer_class,
+    prefetch_related: Optional[List[Union[str, object]]] = None,
+    select_related: Optional[List[str]] = None
+):
+    queryset = model_class.objects
+    if prefetch_related:
+        queryset = queryset.prefetch_related(*prefetch_related)
+    if select_related:
+        queryset = queryset.select_related(*select_related)
+
+    instance = queryset.get(id=id)
     serializer = serializer_class(instance)
     return serializer.data
 

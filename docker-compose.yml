@@ -1,5 +1,5 @@
 services:
-  mull: &backend
+  chess: &backend
     build:
       context: .
       dockerfile: Dockerfile
@@ -17,7 +17,7 @@ services:
     networks:
       - auraflux_network
 
-  worker_mull:
+  worker_chess:
     <<: *backend
     container_name: auraflux_worker_chess
     env_file:
