@@ -62,28 +62,54 @@ def instance_to_data(instance, serializer_class, many=True):
     serializer = serializer_class(instance, many=many)
     return serializer.data
 
-def update_serialized_data_by_id(id: UUID, data: Dict[str, Any], model_class, serializer_class):
+def update_serialized_data_by_id(
+    id: UUID,
+    data: Dict[str, Any],
+    model_class,
+    serializer_class,
+    update_serializer_class=None,
+    **save_kwargs
+):
+    if update_serializer_class is None:
+        update_serializer_class = serializer_class
+
     instance = model_class.objects.get(id=id)
-    serializer = serializer_class(
+    serializer = update_serializer_class(
         instance=instance,
         data=data,
         partial=True
     )
-    if serializer.is_valid():
-        serializer.save()
-        return serializer.data
-    else:
+    if not serializer.is_valid():
         raise ValidationError(serializer.errors)
 
-def update_serialized_data_by_query(query: Dict, data: Dict[str, Any], model_class, serializer_class):
+    serializer.save(**save_kwargs)
+
+    refreshed_instance = instance.__class__.objects.get(pk=instance.pk)
+    response_serializer = serializer_class(refreshed_instance)
+    return response_serializer.data
+
+def update_serialized_data_by_query(
+    query: Dict,
+    data: Dict[str, Any],
+    model_class,
+    serializer_class,
+    update_serializer_class=None,
+    **save_kwargs
+):
+    if update_serializer_class is None:
+        update_serializer_class = serializer_class
+
     instance = model_class.objects.get(**query)
-    serializer = serializer_class(
+    serializer = update_serializer_class(
         instance=instance,
         data=data,
         partial=True
     )
-    if serializer.is_valid():
-        serializer.save()
-        return serializer.data
-    else:
+    if not serializer.is_valid():
         raise ValidationError(serializer.errors)
+
+    serializer.save(**save_kwargs)
+
+    refreshed_instance = instance.__class__.objects.get(pk=instance.pk)
+    response_serializer = serializer_class(refreshed_instance)
+    return response_serializer.data

@@ -1,15 +1,17 @@
 from adrf.views import APIView
 from asgiref.sync import sync_to_async
-from core.utils import get_serialized_data_by_id
+from core.utils import get_serialized_data_by_id, update_serialized_data_by_id
 from django.core.cache import cache
 from django.http import Http404
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from .models import Canvas, Node
+from .models import Canvas, Edge, Node
 from .serializers import (BatchNodePositionUpdateSerializer,
-                          CanvasGraphSerializer)
+                          CanvasGraphSerializer, EdgeSerializer,
+                          EdgeUpdateSerializer, NodeSerializer,
+                          NodeUpdateSerializer)
 from .utils import update_node_positions_by_serializer
 
 
@@ -54,3 +56,57 @@ class CanvasBatchPositionUpdateAPIView(APIView):
         await sync_to_async(cache.delete)(f'canvas_graph_{canvasId}')
 
         return Response({"status": "success", "updated_count": updated_count})
+
+class NodeDetailView(APIView):
+    async def put(self, request, canvasId, nodeId):
+        try:
+            canvas = await sync_to_async(Canvas.objects.get)(pk=canvasId)
+        except Canvas.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            node = await sync_to_async(Node.objects.get)(pk=nodeId, canvas=canvas)
+        except Node.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            response_data = await sync_to_async(update_serialized_data_by_id)(
+                id=node.pk,
+                data=request.data,
+                model_class=Node,
+                serializer_class=NodeSerializer,
+                update_serializer_class=NodeUpdateSerializer
+            )
+        except ValidationError as e:
+            return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+
+        await sync_to_async(cache.delete)(f'canvas_graph_{canvasId}')
+
+        return Response(response_data, status=status.HTTP_200_OK)
+
+class EdgeDetailView(APIView):
+    async def put(self, request, canvasId, edgeId):
+        try:
+            canvas = await sync_to_async(Canvas.objects.get)(pk=canvasId)
+        except Canvas.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            edge = await sync_to_async(Edge.objects.get)(pk=edgeId, source__canvas=canvas)
+        except Edge.DoesNotExist:
+            return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            response_data = await sync_to_async(update_serialized_data_by_id)(
+                id=edge.pk,
+                data=request.data,
+                model_class=Edge,
+                serializer_class=EdgeSerializer,
+                update_serializer_class=EdgeUpdateSerializer
+            )
+        except ValidationError as e:
+            return Response(e.detail, status=status.HTTP_400_BAD_REQUEST)
+
+        await sync_to_async(cache.delete)(f'canvas_graph_{canvasId}')
+
+        return Response(response_data, status=status.HTTP_200_OK)

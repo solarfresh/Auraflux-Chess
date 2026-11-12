@@ -32,12 +32,35 @@ class NodeSerializer(serializers.ModelSerializer):
     def get_position(self, obj):
         return {'x': obj.pos_x, 'y': obj.pos_y}
 
+class NodeUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Node
+        fields = ['label', 'content', 'status', 'rationale']
+        extra_kwargs = {
+            'label': {'required': False, 'allow_blank': False, 'max_length': 255},
+            'content': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'status': {'required': False, 'allow_blank': False, 'max_length': 20},
+            'rationale': {'required': False, 'allow_blank': True, 'allow_null': True},
+        }
+
 class EdgeSerializer(serializers.ModelSerializer):
     type = serializers.CharField(source='edge_type')
 
     class Meta:
         model = Edge
         fields = ['id', 'source', 'target', 'label', 'type', 'weight', 'status', 'evidence', 'rationale']
+
+class EdgeUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Edge
+        fields = ['label', 'weight', 'status', 'evidence', 'rationale']
+        extra_kwargs = {
+            'label': {'required': False, 'allow_blank': True, 'allow_null': True, 'max_length': 255},
+            'weight': {'required': False},
+            'status': {'required': False, 'allow_blank': False, 'max_length': 20},
+            'evidence': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'rationale': {'required': False, 'allow_blank': True, 'allow_null': True},
+        }
 
 class CanvasGraphSerializer(serializers.ModelSerializer):
     nodes = NodeSerializer(many=True, read_only=True)
