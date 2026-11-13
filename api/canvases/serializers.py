@@ -60,9 +60,12 @@ class NodeUpdateSerializer(serializers.ModelSerializer):
 
 
 class EdgeCreateSerializer(serializers.ModelSerializer):
+    sourceHandle = serializers.CharField(source='source_handle', required=False, allow_blank=True, allow_null=True)
+    targetHandle = serializers.CharField(source='target_handle', required=False, allow_blank=True, allow_null=True)
+
     class Meta:
         model = Edge
-        fields = ['source', 'target', 'edge_type', 'weight', 'label', 'evidence', 'rationale']
+        fields = ['source', 'target', 'edge_type', 'weight', 'label', 'evidence', 'rationale', 'metadata', 'sourceHandle', 'targetHandle']
 
     def validate(self, data):
         canvas_id = self.context.get('canvas_id')
@@ -83,30 +86,35 @@ class EdgeCreateSerializer(serializers.ModelSerializer):
 
 class EdgeSerializer(serializers.ModelSerializer):
     type = serializers.CharField(source='edge_type')
+    sourceHandle = serializers.CharField(source='source_handle', allow_blank=True, allow_null=True)
+    targetHandle = serializers.CharField(source='target_handle', allow_blank=True, allow_null=True)
 
     class Meta:
         model = Edge
-        fields = ['id', 'source', 'target', 'label', 'type', 'weight', 'status', 'evidence', 'rationale']
+        fields = ['id', 'source', 'target', 'label', 'type', 'weight', 'status', 'evidence', 'rationale', 'metadata', 'sourceHandle', 'targetHandle']
 
 
 class EdgeUpdateSerializer(serializers.ModelSerializer):
+    sourceHandle = serializers.CharField(source='source_handle', required=False, allow_blank=True, allow_null=True)
+    targetHandle = serializers.CharField(source='target_handle', required=False, allow_blank=True, allow_null=True)
+
     class Meta:
         model = Edge
-        fields = ['label', 'weight', 'status', 'evidence', 'rationale']
+        fields = ['label', 'weight', 'status', 'evidence', 'rationale', 'metadata', 'sourceHandle', 'targetHandle']
         extra_kwargs = {
             'label': {'required': False, 'allow_blank': True, 'allow_null': True, 'max_length': 255},
             'weight': {'required': False},
             'status': {'required': False, 'allow_blank': False, 'max_length': 20},
             'evidence': {'required': False, 'allow_blank': True, 'allow_null': True},
             'rationale': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'metadata': {'required': False},
         }
 
 
 class CanvasGraphSerializer(serializers.ModelSerializer):
     nodes = NodeSerializer(many=True, read_only=True)
     edges = EdgeSerializer(many=True, read_only=True)
-    canvasId = serializers.UUIDField(source='id')
 
     class Meta:
         model = Canvas
-        fields = ['canvasId', 'nodes', 'edges']
+        fields = ['id', 'title', 'nodes', 'edges']
