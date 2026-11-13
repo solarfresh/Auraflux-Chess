@@ -32,6 +32,21 @@ class NodeSerializer(serializers.ModelSerializer):
     def get_position(self, obj):
         return {'x': obj.pos_x, 'y': obj.pos_y}
 
+
+class NodeCreateSerializer(serializers.ModelSerializer):
+    position = serializers.DictField(write_only=True)
+
+    class Meta:
+        model = Node
+        fields = ['label', 'node_type', 'position']
+
+    def create(self, validated_data):
+        position = validated_data.pop('position')
+        validated_data['pos_x'] = position['x']
+        validated_data['pos_y'] = position['y']
+        return super().create(validated_data)
+
+
 class NodeUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Node
@@ -43,12 +58,14 @@ class NodeUpdateSerializer(serializers.ModelSerializer):
             'rationale': {'required': False, 'allow_blank': True, 'allow_null': True},
         }
 
+
 class EdgeSerializer(serializers.ModelSerializer):
     type = serializers.CharField(source='edge_type')
 
     class Meta:
         model = Edge
         fields = ['id', 'source', 'target', 'label', 'type', 'weight', 'status', 'evidence', 'rationale']
+
 
 class EdgeUpdateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -61,6 +78,7 @@ class EdgeUpdateSerializer(serializers.ModelSerializer):
             'evidence': {'required': False, 'allow_blank': True, 'allow_null': True},
             'rationale': {'required': False, 'allow_blank': True, 'allow_null': True},
         }
+
 
 class CanvasGraphSerializer(serializers.ModelSerializer):
     nodes = NodeSerializer(many=True, read_only=True)

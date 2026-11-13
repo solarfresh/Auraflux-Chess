@@ -5,11 +5,20 @@ from django.conf import settings
 from rest_framework.exceptions import ValidationError
 
 
-def create_serialized_data(data: Dict[str, Any], serializer_class, **save_kwargs)-> Dict[str, Any]:
-    serializer = serializer_class(data=data)
+def create_serialized_data(
+    data: Dict[str, Any],
+    serializer_class,
+    create_serializer_class=None,
+    **save_kwargs
+) -> Dict[str, Any]:
+    if create_serializer_class is None:
+        create_serializer_class = serializer_class
+
+    serializer = create_serializer_class(data=data)
     if serializer.is_valid():
-        serializer.save(**save_kwargs)
-        return serializer.data
+        instance = serializer.save(**save_kwargs)
+        # Return full serialized instance data
+        return serializer_class(instance).data
     else:
         raise ValidationError(serializer.errors)
 

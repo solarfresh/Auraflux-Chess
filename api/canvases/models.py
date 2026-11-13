@@ -15,7 +15,7 @@ class Node(BaseModel):
     content = models.TextField(blank=True, null=True)
     pos_x = models.FloatField()
     pos_y = models.FloatField()
-    status = models.CharField(max_length=20, choices=EntityStatus.choices)
+    status = models.CharField(max_length=20, choices=EntityStatus.choices, default=EntityStatus.ACTIVE)
     rationale = models.TextField(blank=True, null=True)
 
 class Edge(BaseModel):

@@ -2,7 +2,8 @@ import uuid
 from unittest.mock import MagicMock
 
 import pytest
-from core.utils import update_serialized_data_by_id, get_serialized_data_by_id
+from core.utils import (create_serialized_data, get_serialized_data_by_id,
+                        update_serialized_data_by_id)
 from rest_framework.exceptions import ValidationError
 
 
@@ -101,3 +102,42 @@ def test_update_serialized_data_by_id_not_found(mock_model_manager_factory):
             model_class=model_class,
             serializer_class=serializer_class
         )
+
+def test_create_serialized_data_success():
+    serializer_class = MagicMock()
+    serializer_instance = MagicMock()
+    serializer_instance.is_valid.return_value = True
+    serializer_instance.save.return_value = MagicMock()
+
+    response_serializer_instance = MagicMock()
+    response_serializer_instance.data = {"id": 1, "name": "test"}
+
+    def side_effect(*args, **kwargs):
+        if "data" in kwargs or len(args) > 0 and isinstance(args[0], dict):
+            return serializer_instance
+        return response_serializer_instance
+
+    serializer_class.side_effect = side_effect
+
+    data = {"name": "test"}
+    result = create_serialized_data(
+        data=data,
+        serializer_class=serializer_class
+    )
+
+    assert result == {"id": 1, "name": "test"}
+    serializer_instance.save.assert_called_once()
+
+def test_create_serialized_data_validation_error():
+    serializer_class = MagicMock()
+    serializer_instance = MagicMock()
+    serializer_instance.is_valid.return_value = False
+    serializer_instance.errors = {"name": ["Required"]}
+    serializer_class.return_value = serializer_instance
+
+    with pytest.raises(ValidationError):
+        create_serialized_data(
+            data={},
+            serializer_class=serializer_class
+        )
+    serializer_instance.save.assert_not_called()
