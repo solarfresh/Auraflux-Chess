@@ -9,12 +9,13 @@ def create_serialized_data(
     data: Dict[str, Any],
     serializer_class,
     create_serializer_class=None,
+    context: Optional[Dict[str, Any]] = None,
     **save_kwargs
 ) -> Dict[str, Any]:
     if create_serializer_class is None:
         create_serializer_class = serializer_class
 
-    serializer = create_serializer_class(data=data)
+    serializer = create_serializer_class(data=data, context=context or {})
     if serializer.is_valid():
         instance = serializer.save(**save_kwargs)
         # Return full serialized instance data

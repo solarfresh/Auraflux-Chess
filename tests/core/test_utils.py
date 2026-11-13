@@ -141,3 +141,30 @@ def test_create_serialized_data_validation_error():
             serializer_class=serializer_class
         )
     serializer_instance.save.assert_not_called()
+
+def test_create_serialized_data_with_context():
+    serializer_class = MagicMock()
+    serializer_instance = MagicMock()
+    serializer_instance.is_valid.return_value = True
+    serializer_instance.save.return_value = MagicMock()
+
+    response_serializer_instance = MagicMock()
+    response_serializer_instance.data = {"id": 1, "name": "test"}
+
+    def side_effect(*args, **kwargs):
+        if "data" in kwargs:
+            # Check if context was passed correctly
+            assert kwargs.get('context') == {'test_key': 'test_value'}
+            return serializer_instance
+        return response_serializer_instance
+
+    serializer_class.side_effect = side_effect
+
+    result = create_serialized_data(
+        data={"name": "test"},
+        serializer_class=serializer_class,
+        context={'test_key': 'test_value'}
+    )
+
+    assert result == {"id": 1, "name": "test"}
+    serializer_instance.save.assert_called_once()

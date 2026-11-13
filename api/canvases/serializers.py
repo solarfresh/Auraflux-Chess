@@ -59,6 +59,28 @@ class NodeUpdateSerializer(serializers.ModelSerializer):
         }
 
 
+class EdgeCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Edge
+        fields = ['source', 'target', 'edge_type', 'weight', 'label', 'evidence', 'rationale']
+
+    def validate(self, data):
+        canvas_id = self.context.get('canvas_id')
+        if not canvas_id:
+            raise serializers.ValidationError("Canvas ID is required.")
+
+        source = data.get('source')
+        target = data.get('target')
+
+        if not Node.objects.filter(id=source.id, canvas_id=canvas_id).exists():
+            raise serializers.ValidationError(f"Source node {source.id} does not exist in canvas {canvas_id}.")
+
+        if not Node.objects.filter(id=target.id, canvas_id=canvas_id).exists():
+            raise serializers.ValidationError(f"Target node {target.id} does not exist in canvas {canvas_id}.")
+
+        return data
+
+
 class EdgeSerializer(serializers.ModelSerializer):
     type = serializers.CharField(source='edge_type')
 
