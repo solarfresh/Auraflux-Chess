@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
-from .models import Canvas, Edge, Node
+from .constants import HandlePosition, HandleType
+from .models import Canvas, Edge, Node, NodeHandle
 
 
 class BatchNodePositionUpdateSerializer(serializers.Serializer):
@@ -21,13 +22,21 @@ class BatchNodePositionUpdateSerializer(serializers.Serializer):
                 raise serializers.ValidationError("Position 'x' and 'y' must be numbers.")
         return value
 
+
+class NodeHandleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NodeHandle
+        fields = ['id', 'handle_type', 'position']
+
+
 class NodeSerializer(serializers.ModelSerializer):
     position = serializers.SerializerMethodField()
     type = serializers.CharField(source='node_type')
+    handles = NodeHandleSerializer(many=True, read_only=True)
 
     class Meta:
         model = Node
-        fields = ['id', 'label', 'type', 'content', 'position', 'status', 'rationale']
+        fields = ['id', 'label', 'type', 'content', 'position', 'status', 'rationale', 'handles']
 
     def get_position(self, obj):
         return {'x': obj.pos_x, 'y': obj.pos_y}
@@ -44,7 +53,16 @@ class NodeCreateSerializer(serializers.ModelSerializer):
         position = validated_data.pop('position')
         validated_data['pos_x'] = position['x']
         validated_data['pos_y'] = position['y']
-        return super().create(validated_data)
+        node = super().create(validated_data)
+        for handle_type in HandleType:
+            for position in HandlePosition:
+                NodeHandle.objects.create(
+                    node=node,
+                    handle_type=handle_type,
+                    position=position
+                )
+
+        return node
 
 
 class NodeUpdateSerializer(serializers.ModelSerializer):

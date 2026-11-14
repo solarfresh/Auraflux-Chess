@@ -2,11 +2,12 @@ from core.constants import EntityStatus
 from core.models import BaseModel
 from django.db import models
 
-from .constants import EdgeType, NodeType
+from .constants import EdgeType, HandlePosition, HandleType, NodeType
 
 
 class Canvas(BaseModel):
     title = models.CharField(max_length=255)
+
 
 class Node(BaseModel):
     canvas = models.ForeignKey(Canvas, on_delete=models.CASCADE, related_name='nodes', db_index=True)
@@ -17,6 +18,16 @@ class Node(BaseModel):
     pos_y = models.FloatField()
     status = models.CharField(max_length=20, choices=EntityStatus.choices, default=EntityStatus.ACTIVE)
     rationale = models.TextField(blank=True, null=True)
+
+
+class NodeHandle(BaseModel):
+    node = models.ForeignKey(Node, on_delete=models.CASCADE, related_name='handles')
+    handle_type = models.CharField(max_length=20, choices=HandleType.choices)
+    position = models.CharField(max_length=20, choices=HandlePosition.choices)
+
+    class Meta:
+        unique_together = ('node', 'id')
+
 
 class Edge(BaseModel):
     canvas = models.ForeignKey(Canvas, on_delete=models.CASCADE, related_name='edges', db_index=True)
