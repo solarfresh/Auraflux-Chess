@@ -14,6 +14,7 @@ PACKAGE_LIST = [
     'iam',
     'canvases',
     'messaging',
+    'realtime',
     'services'
 ]
 

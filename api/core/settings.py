@@ -37,7 +37,8 @@ INSTALLED_APPS = [
     # Local apps
     'agents.apps.AgentsConfig',
     'canvases.apps.CanvasesConfig',
-    'messaging.apps.MessagingConfig'
+    'messaging.apps.MessagingConfig',
+    'realtime.apps.RealtimeConfig'
     # 'users.apps.UsersConfig',
 ]
 
