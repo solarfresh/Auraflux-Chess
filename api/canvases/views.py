@@ -1,18 +1,22 @@
 from adrf.views import APIView
 from asgiref.sync import sync_to_async
-from core.utils import (create_serialized_data, get_serialized_data_by_id,
-                          update_serialized_data_by_id)
+from core.utils import (create_serialized_data, execute_serializer_method,
+                        get_serialized_data_by_id,
+                        update_serialized_data_by_id)
 from django.core.cache import cache
+from django.db import transaction
 from django.http import Http404
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .models import Canvas, Edge, Node
-from .serializers import (BatchNodePositionUpdateSerializer,
-                          CanvasGraphSerializer, EdgeSerializer,
-                          EdgeUpdateSerializer, NodeCreateSerializer,
-                          NodeSerializer, NodeUpdateSerializer, EdgeCreateSerializer)
+from .serializers import (BatchDeleteNodeSerializer,
+                          BatchNodePositionUpdateSerializer,
+                          CanvasGraphSerializer, EdgeCreateSerializer,
+                          EdgeSerializer, EdgeUpdateSerializer,
+                          NodeCreateSerializer, NodeSerializer,
+                          NodeUpdateSerializer)
 from .utils import update_node_positions_by_serializer
 
 
@@ -124,6 +128,28 @@ class NodeDetailView(APIView):
         await sync_to_async(cache.delete)(f'canvas_graph_{canvasId}')
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ReviewNodeDeleteView(APIView):
+    async def delete(self, request, canvasId):
+        try:
+            canvas = await sync_to_async(Canvas.objects.get)(pk=canvasId)
+        except Canvas.DoesNotExist:
+            return Response({"detail": "Canvas not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        @sync_to_async
+        @transaction.atomic
+        def perform_delete():
+            return execute_serializer_method(BatchDeleteNodeSerializer, 'delete_nodes', canvas.id)
+
+        node_ids, edge_ids = await perform_delete()
+
+        await sync_to_async(cache.delete)(f'canvas_graph_{canvasId}')
+
+        return Response({
+            "deletedNodeIds": node_ids,
+            "deletedEdgeIds": edge_ids
+        }, status=status.HTTP_200_OK)
 
 
 class EdgeListView(APIView):
