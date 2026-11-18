@@ -21,7 +21,7 @@ def test_batch_delete_node_serializer():
     edge_active = Edge.objects.create(canvas=canvas, source=node_active, target=node_active, status='ACTIVE')
 
     serializer = BatchDeleteNodeSerializer()
-    deleted_nodes, deleted_edges = serializer.delete_nodes(canvas.id)
+    deleted_nodes, deleted_edges = serializer.delete_nodes(canvas.id) # type: ignore
 
     # Assertions
     assert len(deleted_nodes) == 2
@@ -71,3 +71,103 @@ def test_node_serializer_without_handles():
     data_dict = dict(data)
     assert "handles" in data_dict
     assert data_dict["handles"] == []
+
+
+@pytest.mark.django_db
+def test_canvas_graph_import_serializer_success():
+    from canvases.serializers import CanvasGraphImportSerializer
+    canvas = Canvas.objects.create(title="Import Canvas")
+
+    payload = {
+        "canvas_id": str(canvas.id),
+        "nodes": [
+            {
+                "temp_id": "node_a",
+                "label": "Node A",
+                "node_type": "CONCEPT",
+                "position": {"x": 100, "y": 200}
+            },
+            {
+                "temp_id": "node_b",
+                "label": "Node B",
+                "node_type": "CONCEPT",
+                "position": {"x": 300, "y": 400}
+            }
+        ],
+        "edges": [
+            {
+                "source": "node_a",
+                "target": "node_b",
+                "edge_type": "LINK",
+                "label": "Link A-B"
+            }
+        ]
+    }
+
+    serializer = CanvasGraphImportSerializer(data=payload, context={'canvas_id': canvas.id})
+    assert serializer.is_valid(), serializer.errors
+    result = serializer.save()
+
+    assert isinstance(result, dict)
+    assert result.get("canvas") == canvas
+    assert len(result.get("persisted_nodes", [])) == 2
+    assert len(result.get("persisted_edges", [])) == 1
+
+    # Check NodeHandles were created (8 handles per node: 2 handle types * 4 positions)
+    for node in result.get("persisted_nodes", []):
+        assert NodeHandle.objects.filter(node=node).count() == 8
+
+
+@pytest.mark.django_db
+def test_canvas_graph_import_serializer_invalid_canvas():
+    import uuid
+    from rest_framework.exceptions import ValidationError
+    from canvases.serializers import CanvasGraphImportSerializer
+
+    payload = {
+        "canvas_id": str(uuid.uuid4()),
+        "nodes": [
+            {
+                "temp_id": "node_a",
+                "label": "Node A",
+                "node_type": "CONCEPT",
+                "position": {"x": 0, "y": 0}
+            }
+        ]
+    }
+
+    serializer = CanvasGraphImportSerializer(data=payload, context={'canvas_id': payload['canvas_id']})
+    assert serializer.is_valid()
+    with pytest.raises(ValidationError):
+        serializer.save()
+
+
+@pytest.mark.django_db
+def test_canvas_graph_import_serializer_invalid_edge_reference():
+    from rest_framework.exceptions import ValidationError
+    from canvases.serializers import CanvasGraphImportSerializer
+
+    canvas = Canvas.objects.create(title="Import Canvas 2")
+    payload = {
+        "canvas_id": str(canvas.id),
+        "nodes": [
+            {
+                "temp_id": "node_a",
+                "label": "Node A",
+                "node_type": "CONCEPT",
+                "position": {"x": 0, "y": 0}
+            }
+        ],
+        "edges": [
+            {
+                "source": "node_a",
+                "target": "non_existent_node",
+                "edge_type": "LINK"
+            }
+        ]
+    }
+
+    serializer = CanvasGraphImportSerializer(data=payload, context={'canvas_id': canvas.id})
+    assert serializer.is_valid()
+    with pytest.raises(ValidationError):
+        serializer.save()

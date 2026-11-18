@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.db import transaction
 
 from .constants import HandlePosition, HandleType
 from .models import Canvas, Edge, Node, NodeHandle
@@ -44,13 +45,15 @@ class NodeSerializer(serializers.ModelSerializer):
 
 class NodeCreateSerializer(serializers.ModelSerializer):
     position = serializers.DictField(write_only=True)
+    temp_id = serializers.CharField(required=False, allow_blank=True, allow_null=True, write_only=True)
 
     class Meta:
         model = Node
-        fields = ['label', 'node_type', 'position']
+        fields = ['label', 'node_type', 'position', 'temp_id']
 
     def create(self, validated_data):
         position = validated_data.pop('position')
+        validated_data.pop('temp_id', None)
         validated_data['pos_x'] = position['x']
         validated_data['pos_y'] = position['y']
         node = super().create(validated_data)
@@ -78,6 +81,8 @@ class NodeUpdateSerializer(serializers.ModelSerializer):
 
 
 class EdgeCreateSerializer(serializers.ModelSerializer):
+    source = serializers.CharField()
+    target = serializers.CharField()
     sourceHandle = serializers.CharField(source='source_handle', required=False, allow_blank=True, allow_null=True)
     targetHandle = serializers.CharField(source='target_handle', required=False, allow_blank=True, allow_null=True)
 
@@ -86,19 +91,11 @@ class EdgeCreateSerializer(serializers.ModelSerializer):
         fields = ['source', 'target', 'edge_type', 'weight', 'label', 'evidence', 'rationale', 'metadata', 'sourceHandle', 'targetHandle']
 
     def validate(self, data):
-        canvas_id = self.context.get('canvas_id')
-        if not canvas_id:
-            raise serializers.ValidationError("Canvas ID is required.")
-
-        source = data.get('source')
-        target = data.get('target')
-
-        if not Node.objects.filter(id=source.id, canvas_id=canvas_id).exists():
-            raise serializers.ValidationError(f"Source node {source.id} does not exist in canvas {canvas_id}.")
-
-        if not Node.objects.filter(id=target.id, canvas_id=canvas_id).exists():
-            raise serializers.ValidationError(f"Target node {target.id} does not exist in canvas {canvas_id}.")
-
+        # We don't need to look up in database here because nodes are created in the same transaction
+        # and IDs are not yet assigned.
+        # Just ensure 'source' and 'target' are strings (temp_ids).
+        if not isinstance(data.get('source'), str) or not isinstance(data.get('target'), str):
+            raise serializers.ValidationError("Source and target must be string references (temp_ids).")
         return data
 
 
@@ -151,3 +148,87 @@ class BatchDeleteNodeSerializer(serializers.Serializer):
         nodes_to_delete.delete()
 
         return node_ids, edge_ids
+
+
+class CanvasGraphImportSerializer(serializers.Serializer):
+    canvas_id = serializers.UUIDField()
+    nodes = NodeCreateSerializer(many=True)
+    edges = EdgeCreateSerializer(many=True, required=False, default=list)
+
+    def _get_canvas(self, canvas_id):
+        try:
+            return Canvas.objects.get(id=canvas_id)
+        except Canvas.DoesNotExist:
+            raise serializers.ValidationError(f"Canvas {canvas_id} not found.")
+
+    def _create_nodes(self, canvas, nodes_data):
+        created_nodes_map = {}
+        nodes_to_create = []
+        temp_ids = []
+
+        for index, n_data in enumerate(nodes_data):
+            temp_id = n_data.pop('temp_id', None) or str(index)
+            temp_ids.append(temp_id)
+
+            position = n_data.pop('position')
+            n_data['pos_x'] = position['x']
+            n_data['pos_y'] = position['y']
+            nodes_to_create.append(Node(canvas=canvas, **n_data))
+
+        persisted_nodes = Node.objects.bulk_create(nodes_to_create)
+
+        handles_to_create = []
+        for node in persisted_nodes:
+            for handle_type in HandleType:
+                for position in HandlePosition:
+                    handles_to_create.append(
+                        NodeHandle(
+                            node=node,
+                            handle_type=handle_type,
+                            position=position
+                        )
+                    )
+        NodeHandle.objects.bulk_create(handles_to_create)
+
+        for temp_id, node in zip(temp_ids, persisted_nodes):
+            created_nodes_map[str(temp_id)] = node
+
+        return created_nodes_map, persisted_nodes
+
+    def _create_edges(self, canvas, edges_data, created_nodes_map):
+        edges_to_create = []
+        for e_data in edges_data:
+            source_temp = str(e_data.get('source'))
+            target_temp = str(e_data.get('target'))
+
+            if source_temp not in created_nodes_map or target_temp not in created_nodes_map:
+                raise serializers.ValidationError("Edge source or target reference not found in created nodes.")
+
+            source_node = created_nodes_map[source_temp]
+            target_node = created_nodes_map[target_temp]
+
+            if source_node.canvas_id != canvas.id or target_node.canvas_id != canvas.id:
+                raise serializers.ValidationError("Edge source or target does not belong to the target canvas.")
+
+            e_data['canvas'] = canvas
+            e_data['source'] = source_node
+            e_data['target'] = target_node
+
+            edges_to_create.append(Edge(**e_data))
+
+        return Edge.objects.bulk_create(edges_to_create)
+
+    def create(self, validated_data):
+        canvas = self._get_canvas(validated_data['canvas_id'])
+        nodes_data = validated_data['nodes']
+        edges_data = validated_data.get('edges', [])
+
+        with transaction.atomic():
+            created_nodes_map, persisted_nodes = self._create_nodes(canvas, nodes_data)
+            persisted_edges = self._create_edges(canvas, edges_data, created_nodes_map)
+
+        return {
+            "canvas": canvas,
+            "persisted_nodes": persisted_nodes,
+            "persisted_edges": persisted_edges
+        }

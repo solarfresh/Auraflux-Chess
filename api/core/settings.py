@@ -35,7 +35,10 @@ INSTALLED_APPS = [
     'drf_spectacular_sidecar',
 
     # Local apps
-    'canvases.apps.CanvasesConfig'
+    'agents.apps.AgentsConfig',
+    'canvases.apps.CanvasesConfig',
+    'messaging.apps.MessagingConfig',
+    'realtime.apps.RealtimeConfig'
     # 'users.apps.UsersConfig',
 ]
 

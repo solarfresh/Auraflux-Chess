@@ -1,3 +1,5 @@
+import uuid
+
 from adrf.views import APIView
 from asgiref.sync import sync_to_async
 from core.utils import (create_serialized_data, execute_serializer_method,
@@ -6,6 +8,8 @@ from core.utils import (create_serialized_data, execute_serializer_method,
 from django.core.cache import cache
 from django.db import transaction
 from django.http import Http404
+from messaging.constants import NodeActionRequest
+from messaging.tasks import publish_event
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -217,3 +221,53 @@ class EdgeDetailView(APIView):
         await sync_to_async(cache.delete)(f'canvas_graph_{canvasId}')
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class NodeActionView(APIView):
+    async def post(self, request, canvasId, nodeId):
+        action_type = request.data.get('actionType')
+        session_id = request.headers.get('X-Session-ID') or str(uuid.uuid4())
+
+        valid_actions = [
+            "DecompositionAgent",
+            "HypothesisAnalysisAgent",
+            "LogicCritiqueAgent",
+            "BoundaryAgent"
+        ]
+
+        if action_type not in valid_actions:
+            return Response(
+                {"error": "Invalid action type", "code": "INVALID_ACTION"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            canvas = await sync_to_async(Canvas.objects.get)(pk=canvasId)
+            node = await sync_to_async(Node.objects.get)(pk=nodeId, canvas=canvas)
+        except (Canvas.DoesNotExist, Node.DoesNotExist):
+            return Response(
+                {"error": "Node not found or not in canvas", "code": "NODE_NOT_FOUND"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        if node.status != 'active':
+            return Response(
+                {"error": "Node is not active", "code": "INVALID_STATUS"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        publish_event.delay(
+            event_type=NodeActionRequest.name,
+            payload={
+                "canvas_id": canvasId,
+                "node_id": nodeId,
+                "action_type": action_type,
+                "session_id": session_id
+            },
+            queue=NodeActionRequest.queue
+        )
+
+        return Response({
+            "status": "accepted",
+            "sessionId": session_id
+        }, status=status.HTTP_202_ACCEPTED)
