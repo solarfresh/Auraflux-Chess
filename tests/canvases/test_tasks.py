@@ -5,7 +5,7 @@ from canvases.tasks import handle_node_action_request
 from messaging.constants import AgentRequest, NodeActionPersistence
 
 @pytest.mark.django_db
-@patch("canvases.tasks.publish_event.delay")
+@patch("messaging.tasks.publish_event.delay")
 def test_handle_node_action_request_success(mock_publish_delay):
     # Setup Canvas and Node
     canvas = Canvas.objects.create(title="Test Canvas")
@@ -21,7 +21,7 @@ def test_handle_node_action_request_success(mock_publish_delay):
     payload = {
         "canvas_id": str(canvas.id),
         "node_id": str(node.id),
-        "action_type": "evaluate",
+        "action_type": "DecompositionAgent",
         "session_id": "sess-123"
     }
 
@@ -34,7 +34,7 @@ def test_handle_node_action_request_success(mock_publish_delay):
     assert called_args["queue"] == AgentRequest.queue
 
     published_payload = called_args["payload"]
-    assert published_payload["type"] == "evaluate"
+    assert published_payload["type"] == "DecompositionAgent"
     assert published_payload["payload"]["source_node"]["id"] == str(node.id)
     assert published_payload["payload"]["source_node"]["label"] == "Test Node"
     assert published_payload["payload"]["source_node"]["type"] == "llm"
@@ -44,14 +44,14 @@ def test_handle_node_action_request_success(mock_publish_delay):
     assert published_payload["next_event_payload"]["session_id"] == "sess-123"
 
 @pytest.mark.django_db
-@patch("canvases.tasks.publish_event.delay")
+@patch("messaging.tasks.publish_event.delay")
 def test_handle_node_action_request_node_not_found(mock_publish_delay):
     canvas = Canvas.objects.create(title="Test Canvas")
 
     payload = {
         "canvas_id": str(canvas.id),
         "node_id": "00000000-0000-0000-0000-000000000000",
-        "action_type": "evaluate",
+        "action_type": "DecompositionAgent",
         "session_id": "sess-123"
     }
 
