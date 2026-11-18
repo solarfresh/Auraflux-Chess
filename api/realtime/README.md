@@ -39,10 +39,10 @@ ws.onclose = function(event) {
 
 ### 2. Sending Notifications from Backend
 
-You can use the helper function `send_ws_notification` from `api.realtime.utils`:
+You can use the helper function `send_ws_notification` from `realtime.utils`:
 
 ```python
-from api.realtime.utils import send_ws_notification
+from realtime.utils import send_ws_notification
 
 # Send notification to a specific user
 send_ws_notification(

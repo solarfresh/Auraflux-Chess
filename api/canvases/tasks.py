@@ -1,11 +1,18 @@
 import logging
+from typing import cast
 
+from asgiref.sync import async_to_sync
 from canvases.models import Node
-from canvases.serializers import CanvasGraphImportSerializer
+from canvases.serializers import (CanvasGraphImportSerializer, EdgeSerializer,
+                                  NodeSerializer)
+from channels.layers import get_channel_layer
 from core.celery_app import celery_app
+from core.constants import ProcessStatus
 from messaging.constants import (AgentRequest, NodeActionPersistence,
                                  NodeActionRequest)
 from messaging.tasks import publish_event
+from realtime.constants import RealtimeEventType
+from realtime.utils import broadcast_event
 from services.agent_service import AgentConfigService
 
 logger = logging.getLogger(__name__)
@@ -123,28 +130,38 @@ def handle_node_action_persistence(event_type: str, payload: dict):
         if not serializer.is_valid():
             raise ValueError(f"Invalid import payload: {serializer.errors}")
 
-        result = serializer.save()
-        persisted_nodes = [
-            {
-                "id": str(node.id),
-                "temp_id": node.id,
-                "label": node.label,
-                "status": node.status
-            }
-            for node in result["persisted_nodes"]
-        ]
-        persisted_edges = [
-            {
-                "id": str(edge.id),
-                "source": str(edge.source_id),
-                "target": str(edge.target_id),
-                "status": edge.status
-            }
-            for edge in result["persisted_edges"]
-        ]
+        result = cast(dict, serializer.save())
+        persisted_nodes = NodeSerializer(result["persisted_nodes"], many=True).data
+        persisted_edges = EdgeSerializer(result["persisted_edges"], many=True).data
 
         logger.info(f"Successfully persisted {len(persisted_nodes)} nodes and {len(persisted_edges)} edges for canvas {canvas_id}")
 
+        broadcast_event(
+            group_name=f"canvas_{canvas_id}",
+            event_type=RealtimeEventType.NODE_ACTION_PERSISTED,
+            payload={
+                "status": ProcessStatus.SUCCESS.value.lower(),
+                "payload": {
+                    "canvas_id": str(canvas_id),
+                    "session_id": session_id,
+                    "persisted_nodes": persisted_nodes,
+                    "persisted_edges": persisted_edges
+                }
+            }
+        )
+
     except Exception as e:
         logger.error(f"Failed to persist node action output for canvas {canvas_id}: {str(e)}")
+
+        broadcast_event(
+            group_name=f"canvas_{canvas_id}",
+            event_type=RealtimeEventType.NODE_ACTION_PERSISTED,
+            payload={
+                "status": ProcessStatus.ERROR.value.lower(),
+                "payload": {
+                    "error": str(e),
+                    "canvas_id": str(canvas_id)
+                }
+            }
+        )
         raise

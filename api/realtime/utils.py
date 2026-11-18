@@ -3,6 +3,7 @@ from uuid import UUID
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
+from realtime.constants import RealtimeEventType
 
 
 def get_user_group_name(user_id: UUID) -> str:
@@ -11,6 +12,7 @@ def get_user_group_name(user_id: UUID) -> str:
     This rule MUST be used by the consumer (to join) and the worker (to send).
     """
     return f'user_{user_id}'
+
 
 def send_ws_notification(user_id: UUID, event_type: str, payload: dict):
     """
@@ -30,5 +32,24 @@ def send_ws_notification(user_id: UUID, event_type: str, payload: dict):
             'type': 'send_notification',
             'event_type': event_type,
             'data': payload,
+        }
+    )
+
+
+def broadcast_event(group_name: str, event_type: str, payload: dict):
+    """
+    Broadcasts a notification to a specific WebSocket group.
+    """
+    channel_layer = get_channel_layer()
+    if channel_layer is None:
+        logging.warning("Warning: Channel layer not configured. Cannot broadcast notification.")
+        return
+
+    async_to_sync(channel_layer.group_send)(
+        group_name,
+        {
+            'type': RealtimeEventType.BROADCAST_EVENT,
+            'event_type': event_type,
+            'message': payload,
         }
     )
