@@ -136,3 +136,18 @@ class CanvasGraphSerializer(serializers.ModelSerializer):
     class Meta:
         model = Canvas
         fields = ['id', 'title', 'nodes', 'edges']
+
+
+class BatchDeleteNodeSerializer(serializers.Serializer):
+    def delete_nodes(self, canvas_id):
+        from .models import Edge, Node
+        nodes_to_delete = Node.objects.filter(canvas_id=canvas_id, status='REVIEW')
+        node_ids = list(nodes_to_delete.values_list('id', flat=True))
+
+        edges_to_delete = Edge.objects.filter(source__in=node_ids) | Edge.objects.filter(target__in=node_ids)
+        edge_ids = list(edges_to_delete.values_list('id', flat=True))
+
+        edges_to_delete.delete()
+        nodes_to_delete.delete()
+
+        return node_ids, edge_ids

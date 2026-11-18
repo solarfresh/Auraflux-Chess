@@ -123,3 +123,8 @@ def update_serialized_data_by_query(
     refreshed_instance = instance.__class__.objects.get(pk=instance.pk)
     response_serializer = serializer_class(refreshed_instance)
     return response_serializer.data
+
+def execute_serializer_method(serializer_class, method_name, instance=None, data=None, *args, **kwargs):
+    serializer = serializer_class(instance=instance, data=data)
+    method = getattr(serializer, method_name)
+    return method(*args, **kwargs)
