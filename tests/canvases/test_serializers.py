@@ -21,7 +21,7 @@ def test_batch_delete_node_serializer():
     edge_active = Edge.objects.create(canvas=canvas, source=node_active, target=node_active, status='ACTIVE')
 
     serializer = BatchDeleteNodeSerializer()
-    deleted_nodes, deleted_edges = serializer.delete_nodes(canvas.id)
+    deleted_nodes, deleted_edges = serializer.delete_nodes(canvas.id) # type: ignore
 
     # Assertions
     assert len(deleted_nodes) == 2

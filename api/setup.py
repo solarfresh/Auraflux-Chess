@@ -12,6 +12,7 @@ import shutil
 PACKAGE_LIST = [
     'iam',
     'canvases',
+    'messaging',
     'services'
 ]
 
