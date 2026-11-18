@@ -84,8 +84,9 @@ def handle_node_action_persistence(event_type: str, payload: dict):
         logger.error("Missing canvas_id in NodeActionPersistence payload")
         return
 
-    nodes_data = agent_output.get('nodes', [])
-    edges_data = agent_output.get('edges', [])
+    result_data = agent_output.get('result', {})
+    nodes_data = result_data.get('nodes', {})
+    edges_data = result_data.get('edges', [])
 
     if isinstance(nodes_data, dict):
         nodes_data = list(nodes_data.values())
