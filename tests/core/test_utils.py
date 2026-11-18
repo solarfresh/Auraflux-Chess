@@ -2,7 +2,8 @@ import uuid
 from unittest.mock import MagicMock
 
 import pytest
-from core.utils import (create_serialized_data, get_serialized_data_by_id,
+from core.utils import (create_serialized_data, execute_serializer_method,
+                        get_serialized_data_by_id,
                         update_serialized_data_by_id)
 from rest_framework.exceptions import ValidationError
 
@@ -168,3 +169,29 @@ def test_create_serialized_data_with_context():
 
     assert result == {"id": 1, "name": "test"}
     serializer_instance.save.assert_called_once()
+
+
+def test_execute_serializer_method_success():
+    serializer_class = MagicMock()
+    serializer_instance = MagicMock()
+    serializer_class.return_value = serializer_instance
+
+    # Define a method on the serializer instance
+    def custom_method(val):
+        return val * 2
+    serializer_instance.custom_method = custom_method
+
+    result = execute_serializer_method(serializer_class, "custom_method", val=5)
+
+    assert result == 10
+    serializer_class.assert_called_once_with(instance=None, data=None)
+
+
+def test_execute_serializer_method_attribute_error():
+    # Use a real class that does not have the method
+    class MockSerializer:
+        def __init__(self, instance=None, data=None):
+            pass
+
+    with pytest.raises(AttributeError):
+        execute_serializer_method(MockSerializer, "non_existent_method")

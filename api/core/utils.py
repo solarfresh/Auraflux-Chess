@@ -126,5 +126,7 @@ def update_serialized_data_by_query(
 
 def execute_serializer_method(serializer_class, method_name, instance=None, data=None, *args, **kwargs):
     serializer = serializer_class(instance=instance, data=data)
+    if not hasattr(serializer, method_name):
+        raise AttributeError(f"Serializer {serializer_class.__name__} has no method {method_name}")
     method = getattr(serializer, method_name)
     return method(*args, **kwargs)
