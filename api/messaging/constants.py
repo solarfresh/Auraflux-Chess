@@ -11,3 +11,13 @@ class AgentRequest:
 class EmbeddingRequest:
     name = "handle_embedding_request"
     queue = Queue.AGENT
+
+
+class NodeActionRequest:
+    name = "handle_node_action_request"
+    queue = Queue.AGENT
+
+
+class NodeActionPersistence:
+    name = "handle_node_action_persistence"
+    queue = Queue.AGENT

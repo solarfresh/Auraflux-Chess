@@ -8,6 +8,8 @@ from core.utils import (create_serialized_data, execute_serializer_method,
 from django.core.cache import cache
 from django.db import transaction
 from django.http import Http404
+from messaging.constants import NodeActionRequest
+from messaging.tasks import publish_event
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -254,12 +256,18 @@ class NodeActionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # TODO: Trigger Celery Task here
-        # task = some_celery_task.delay(nodeId, action_type, session_id))
-        task_id = "00000000-0000-0000-0000-000000000000"
+        publish_event.delay(
+            event_type=NodeActionRequest.name,
+            payload={
+                "canvas_id": canvasId,
+                "node_id": nodeId,
+                "action_type": action_type,
+                "session_id": session_id
+            },
+            queue=NodeActionRequest.queue
+        )
 
         return Response({
             "status": "accepted",
-            "taskId": task_id,
             "sessionId": session_id
         }, status=status.HTTP_202_ACCEPTED)
