@@ -75,9 +75,9 @@ class NodeUpdateSerializer(serializers.ModelSerializer):
         model = Node
         fields = ['label', 'content', 'status', 'rationale']
         extra_kwargs = {
-            'label': {'required': False, 'allow_blank': False, 'max_length': 255},
+            'label': {'required': False, 'allow_blank': False},
             'content': {'required': False, 'allow_blank': True, 'allow_null': True},
-            'status': {'required': False, 'allow_blank': False, 'max_length': 20},
+            'status': {'required': False, 'allow_blank': False},
             'rationale': {'required': False, 'allow_blank': True, 'allow_null': True},
         }
 
@@ -119,9 +119,9 @@ class EdgeUpdateSerializer(serializers.ModelSerializer):
         model = Edge
         fields = ['label', 'weight', 'status', 'evidence', 'rationale', 'metadata', 'sourceHandle', 'targetHandle']
         extra_kwargs = {
-            'label': {'required': False, 'allow_blank': True, 'allow_null': True, 'max_length': 255},
+            'label': {'required': False, 'allow_blank': True, 'allow_null': True},
             'weight': {'required': False},
-            'status': {'required': False, 'allow_blank': False, 'max_length': 20},
+            'status': {'required': False, 'allow_blank': False},
             'evidence': {'required': False, 'allow_blank': True, 'allow_null': True},
             'rationale': {'required': False, 'allow_blank': True, 'allow_null': True},
             'metadata': {'required': False},
