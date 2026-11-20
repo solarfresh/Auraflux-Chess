@@ -25,9 +25,11 @@ class BatchNodePositionUpdateSerializer(serializers.Serializer):
 
 
 class NodeHandleSerializer(serializers.ModelSerializer):
+    type = serializers.CharField(source='handle_type')
+
     class Meta:
         model = NodeHandle
-        fields = ['id', 'handle_type', 'position']
+        fields = ['id', 'type', 'position']
 
 
 class NodeSerializer(serializers.ModelSerializer):
