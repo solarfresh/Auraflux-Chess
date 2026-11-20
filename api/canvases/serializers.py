@@ -71,11 +71,14 @@ class NodeCreateSerializer(serializers.ModelSerializer):
 
 
 class NodeUpdateSerializer(serializers.ModelSerializer):
+    type = serializers.CharField(source='node_type')
+
     class Meta:
         model = Node
-        fields = ['label', 'content', 'status', 'rationale']
+        fields = ['label', 'type', 'content', 'status', 'rationale']
         extra_kwargs = {
             'label': {'required': False, 'allow_blank': False},
+            'type': {'required': False, 'allow_blank': False},
             'content': {'required': False, 'allow_blank': True, 'allow_null': True},
             'status': {'required': False, 'allow_blank': False},
             'rationale': {'required': False, 'allow_blank': True, 'allow_null': True},
