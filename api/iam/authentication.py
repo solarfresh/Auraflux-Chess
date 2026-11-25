@@ -105,12 +105,7 @@ class JWTAuthMiddleware:
 
     @database_sync_to_async
     def get_user_from_scope(self, scope):
-        import logging
-        logging.info('=== scope ===')
-        logging.info(scope)
         token = self._get_token_from_query(scope)
-        logging.info('=== token ===')
-        logging.info(token)
         auth_header = f"Bearer {token}" if token else None
 
         # Build a lightweight request-like object so JWKSAuthentication.authenticate() can be reused.
