@@ -18,7 +18,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         Called when the WebSocket is handshaking as part of connection.
         """
         user = self.scope.get("user")
-        if user is None or user.is_anonymous:
+        if user is None:
             logger.warning("Anonymous user attempted to connect to NotificationConsumer.")
             await self.close()
             return
