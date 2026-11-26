@@ -171,3 +171,104 @@ def test_canvas_graph_import_serializer_invalid_edge_reference():
     assert serializer.is_valid()
     with pytest.raises(ValidationError):
         serializer.save()
+
+
+@pytest.mark.django_db
+def test_canvas_graph_import_serializer_edge_with_existing_node():
+    from canvases.serializers import CanvasGraphImportSerializer
+    canvas = Canvas.objects.create(title="Existing Canvas")
+
+    # Pre-create an existing node in the canvas
+    existing_node = Node.objects.create(
+        canvas=canvas,
+        label="Existing Node",
+        node_type="CONCEPT",
+        pos_x=0.0,
+        pos_y=0.0
+    )
+
+    payload = {
+        "canvas_id": str(canvas.id),
+        "nodes": [
+            {
+                "temp_id": "node_new",
+                "label": "New Node",
+                "node_type": "CONCEPT",
+                "position": {"x": 100, "y": 100}
+            }
+        ],
+        "edges": [
+            {
+                "source": str(existing_node.id),
+                "target": "node_new",
+                "edge_type": "LINK",
+                "label": "Existing to New"
+            }
+        ]
+    }
+
+    serializer = CanvasGraphImportSerializer(data=payload, context={'canvas_id': canvas.id})
+    assert serializer.is_valid(), serializer.errors
+    result = serializer.save()
+
+    assert isinstance(result, dict)
+    assert len(result.get("persisted_nodes", [])) == 1
+    assert len(result.get("persisted_edges", [])) == 1
+    edges = result.get("persisted_edges")
+    assert edges is not None
+    assert len(edges) == 1
+    edge = edges[0]
+    assert edge.source == existing_node
+    assert edge.target.label == "New Node"
+
+
+@pytest.mark.django_db
+def test_canvas_graph_import_serializer_handles():
+    from canvases.serializers import CanvasGraphImportSerializer
+    canvas = Canvas.objects.create(title="Import Canvas with Handles")
+
+    payload = {
+        "canvas_id": str(canvas.id),
+        "nodes": [
+            {
+                "temp_id": "node_a",
+                "label": "Node A",
+                "node_type": "CONCEPT",
+                "position": {"x": 100, "y": 200}
+            },
+            {
+                "temp_id": "node_b",
+                "label": "Node B",
+                "node_type": "CONCEPT",
+                "position": {"x": 300, "y": 400}
+            }
+        ],
+        "edges": [
+            {
+                "source": "node_a",
+                "target": "node_b",
+                "edge_type": "LINK",
+                "label": "Link A to B"
+            }
+        ]
+    }
+
+    serializer = CanvasGraphImportSerializer(data=payload)
+    assert serializer.is_valid(), serializer.errors
+    result = serializer.save()
+
+    assert isinstance(result, dict)
+    edges = result.get("persisted_edges")
+    assert edges is not None
+    assert len(edges) == 1
+    edge = edges[0]
+    assert edge.source_handle is not None
+    assert edge.target_handle is not None
+
+    # Verify handles exist on the respective nodes
+    source_handle = NodeHandle.objects.get(id=edge.source_handle)
+    target_handle = NodeHandle.objects.get(id=edge.target_handle)
+    assert source_handle.node == edge.source
+    assert target_handle.node == edge.target
+
+

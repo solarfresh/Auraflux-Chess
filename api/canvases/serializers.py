@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.db import transaction
+import uuid
 
 from .constants import HandlePosition, HandleType
 from .models import Canvas, Edge, Node, NodeHandle
@@ -51,7 +52,7 @@ class NodeCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Node
-        fields = ['label', 'node_type', 'position', 'temp_id']
+        fields = ['label', 'node_type', 'position', 'status', 'temp_id']
 
     def create(self, validated_data):
         position = validated_data.pop('position')
@@ -86,6 +87,17 @@ class NodeUpdateSerializer(serializers.ModelSerializer):
 
 
 class EdgeCreateSerializer(serializers.ModelSerializer):
+    source = serializers.PrimaryKeyRelatedField(queryset=Node.objects.all())
+    target = serializers.PrimaryKeyRelatedField(queryset=Node.objects.all())
+    sourceHandle = serializers.CharField(source='source_handle', required=False, allow_blank=True, allow_null=True)
+    targetHandle = serializers.CharField(source='target_handle', required=False, allow_blank=True, allow_null=True)
+
+    class Meta:
+        model = Edge
+        fields = ['source', 'target', 'edge_type', 'weight', 'status', 'label', 'evidence', 'rationale', 'metadata', 'sourceHandle', 'targetHandle']
+
+
+class ImportEdgeCreateSerializer(serializers.ModelSerializer):
     source = serializers.CharField()
     target = serializers.CharField()
     sourceHandle = serializers.CharField(source='source_handle', required=False, allow_blank=True, allow_null=True)
@@ -93,12 +105,9 @@ class EdgeCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Edge
-        fields = ['source', 'target', 'edge_type', 'weight', 'label', 'evidence', 'rationale', 'metadata', 'sourceHandle', 'targetHandle']
+        fields = ['source', 'target', 'edge_type', 'weight', 'status', 'label', 'evidence', 'rationale', 'metadata', 'sourceHandle', 'targetHandle']
 
     def validate(self, data):
-        # We don't need to look up in database here because nodes are created in the same transaction
-        # and IDs are not yet assigned.
-        # Just ensure 'source' and 'target' are strings (temp_ids).
         if not isinstance(data.get('source'), str) or not isinstance(data.get('target'), str):
             raise serializers.ValidationError("Source and target must be string references (temp_ids).")
         return data
@@ -158,7 +167,7 @@ class BatchDeleteNodeSerializer(serializers.Serializer):
 class CanvasGraphImportSerializer(serializers.Serializer):
     canvas_id = serializers.UUIDField()
     nodes = NodeCreateSerializer(many=True)
-    edges = EdgeCreateSerializer(many=True, required=False, default=list)
+    edges = ImportEdgeCreateSerializer(many=True, required=False, default=list)
 
     def _get_canvas(self, canvas_id):
         try:
@@ -201,19 +210,96 @@ class CanvasGraphImportSerializer(serializers.Serializer):
         return created_nodes_map, persisted_nodes
 
     def _create_edges(self, canvas, edges_data, created_nodes_map):
+        if not edges_data:
+            return []
+
+        # Collect node IDs that need to be fetched (existing nodes not in created_nodes_map)
+        missing_node_ids = set()
+        for e_data in edges_data:
+            source_ref = str(e_data.get('source'))
+            target_ref = str(e_data.get('target'))
+            if source_ref not in created_nodes_map:
+                try:
+                    missing_node_ids.add(uuid.UUID(source_ref))
+                except (ValueError, TypeError):
+                    raise serializers.ValidationError(f"Edge source reference '{source_ref}' is not a valid UUID or created node reference.")
+            if target_ref not in created_nodes_map:
+                try:
+                    missing_node_ids.add(uuid.UUID(target_ref))
+                except (ValueError, TypeError):
+                    raise serializers.ValidationError(f"Edge target reference '{target_ref}' is not a valid UUID or created node reference.")
+
+        existing_nodes_map = {}
+        if missing_node_ids:
+            nodes_qs = Node.objects.filter(canvas=canvas, id__in=missing_node_ids)
+            for node in nodes_qs:
+                existing_nodes_map[str(node.id)] = node
+
+            for node_id in missing_node_ids:
+                if str(node_id) not in existing_nodes_map:
+                    raise serializers.ValidationError(f"Edge node reference '{node_id}' not found in created nodes or existing canvas nodes.")
+
+        # Collect all nodes involved to prefetch their handles in batch
+        all_nodes = list(created_nodes_map.values()) + list(existing_nodes_map.values())
+        handles_qs = NodeHandle.objects.filter(node__in=all_nodes)
+
+        # Map node.id -> list of handles
+        node_handles_map = {}
+        for handle in handles_qs:
+            node_id = getattr(handle, 'node_id', None) or (handle.node.id if handle.node else None)
+            if node_id:
+                node_handles_map.setdefault(node_id, []).append(handle)
+
         edges_to_create = []
         for e_data in edges_data:
-            source_temp = str(e_data.get('source'))
-            target_temp = str(e_data.get('target'))
+            source_ref = str(e_data.get('source'))
+            target_ref = str(e_data.get('target'))
 
-            if source_temp not in created_nodes_map or target_temp not in created_nodes_map:
-                raise serializers.ValidationError("Edge source or target reference not found in created nodes.")
+            source_node = created_nodes_map.get(source_ref) or existing_nodes_map.get(source_ref)
+            target_node = created_nodes_map.get(target_ref) or existing_nodes_map.get(target_ref)
 
-            source_node = created_nodes_map[source_temp]
-            target_node = created_nodes_map[target_temp]
+            if not source_node or not target_node:
+                raise serializers.ValidationError("Edge source or target node could not be resolved.")
 
-            if source_node.canvas_id != canvas.id or target_node.canvas_id != canvas.id:
+            if source_node.canvas != canvas or target_node.canvas != canvas:
                 raise serializers.ValidationError("Edge source or target does not belong to the target canvas.")
+
+            source_handles = node_handles_map.get(source_node.id, [])
+            target_handles = node_handles_map.get(target_node.id, [])
+
+            # Validate or default source_handle
+            source_handle_id = e_data.get('source_handle')
+            if source_handle_id:
+                try:
+                    handle_uuid = uuid.UUID(str(source_handle_id))
+                except (ValueError, TypeError):
+                    raise serializers.ValidationError(f"Edge source_handle '{source_handle_id}' is not a valid UUID.")
+                handle_obj = next((h for h in source_handles if h.id == handle_uuid), None)
+                if not handle_obj:
+                    raise serializers.ValidationError(f"Edge source_handle '{source_handle_id}' does not belong to source node '{source_node.id}'.")
+                e_data['source_handle'] = str(handle_obj.id)
+            else:
+                handle_obj = next((h for h in source_handles if h.handle_type == HandleType.SOURCE), None)
+                if not handle_obj:
+                    handle_obj = next((h for h in source_handles if h.position == HandlePosition.RIGHT), None)
+                e_data['source_handle'] = str(handle_obj.id) if handle_obj else None
+
+            # Validate or default target_handle
+            target_handle_id = e_data.get('target_handle')
+            if target_handle_id:
+                try:
+                    handle_uuid = uuid.UUID(str(target_handle_id))
+                except (ValueError, TypeError):
+                    raise serializers.ValidationError(f"Edge target_handle '{target_handle_id}' is not a valid UUID.")
+                handle_obj = next((h for h in target_handles if h.id == handle_uuid), None)
+                if not handle_obj:
+                    raise serializers.ValidationError(f"Edge target_handle '{target_handle_id}' does not belong to target node '{target_node.id}'.")
+                e_data['target_handle'] = str(handle_obj.id)
+            else:
+                handle_obj = next((h for h in target_handles if h.handle_type == HandleType.TARGET), None)
+                if not handle_obj:
+                    handle_obj = next((h for h in target_handles if h.position == HandlePosition.LEFT), None)
+                e_data['target_handle'] = str(handle_obj.id) if handle_obj else None
 
             e_data['canvas'] = canvas
             e_data['source'] = source_node

@@ -5,6 +5,7 @@ from asgiref.sync import sync_to_async
 from core.utils import (create_serialized_data, execute_serializer_method,
                         get_serialized_data_by_id,
                         update_serialized_data_by_id)
+from core.constants import EntityStatus
 from django.core.cache import cache
 from django.db import transaction
 from django.http import Http404
@@ -307,7 +308,7 @@ class NodeActionView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        if node.status != 'active':
+        if node.status != EntityStatus.ACTIVE:
             return Response(
                 {"error": "Node is not active", "code": "INVALID_STATUS"},
                 status=status.HTTP_400_BAD_REQUEST
