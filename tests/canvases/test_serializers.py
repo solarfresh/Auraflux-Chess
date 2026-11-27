@@ -84,13 +84,13 @@ def test_canvas_graph_import_serializer_success():
             {
                 "temp_id": "node_a",
                 "label": "Node A",
-                "node_type": "CONCEPT",
+                "type": "CONCEPT",
                 "position": {"x": 100, "y": 200}
             },
             {
                 "temp_id": "node_b",
                 "label": "Node B",
-                "node_type": "CONCEPT",
+                "type": "CONCEPT",
                 "position": {"x": 300, "y": 400}
             }
         ],
@@ -98,7 +98,7 @@ def test_canvas_graph_import_serializer_success():
             {
                 "source": "node_a",
                 "target": "node_b",
-                "edge_type": "LINK",
+                "type": "LINK",
                 "label": "Link A-B"
             }
         ]
@@ -130,7 +130,7 @@ def test_canvas_graph_import_serializer_invalid_canvas():
             {
                 "temp_id": "node_a",
                 "label": "Node A",
-                "node_type": "CONCEPT",
+                "type": "CONCEPT",
                 "position": {"x": 0, "y": 0}
             }
         ]
@@ -154,7 +154,7 @@ def test_canvas_graph_import_serializer_invalid_edge_reference():
             {
                 "temp_id": "node_a",
                 "label": "Node A",
-                "node_type": "CONCEPT",
+                "type": "CONCEPT",
                 "position": {"x": 0, "y": 0}
             }
         ],
@@ -162,7 +162,7 @@ def test_canvas_graph_import_serializer_invalid_edge_reference():
             {
                 "source": "node_a",
                 "target": "non_existent_node",
-                "edge_type": "LINK"
+                "type": "LINK"
             }
         ]
     }
@@ -193,7 +193,7 @@ def test_canvas_graph_import_serializer_edge_with_existing_node():
             {
                 "temp_id": "node_new",
                 "label": "New Node",
-                "node_type": "CONCEPT",
+                "type": "CONCEPT",
                 "position": {"x": 100, "y": 100}
             }
         ],
@@ -201,7 +201,7 @@ def test_canvas_graph_import_serializer_edge_with_existing_node():
             {
                 "source": str(existing_node.id),
                 "target": "node_new",
-                "edge_type": "LINK",
+                "type": "LINK",
                 "label": "Existing to New"
             }
         ]
@@ -233,13 +233,13 @@ def test_canvas_graph_import_serializer_handles():
             {
                 "temp_id": "node_a",
                 "label": "Node A",
-                "node_type": "CONCEPT",
+                "type": "CONCEPT",
                 "position": {"x": 100, "y": 200}
             },
             {
                 "temp_id": "node_b",
                 "label": "Node B",
-                "node_type": "CONCEPT",
+                "type": "CONCEPT",
                 "position": {"x": 300, "y": 400}
             }
         ],
@@ -247,7 +247,7 @@ def test_canvas_graph_import_serializer_handles():
             {
                 "source": "node_a",
                 "target": "node_b",
-                "edge_type": "LINK",
+                "type": "LINK",
                 "label": "Link A to B"
             }
         ]
