@@ -144,7 +144,7 @@ def handle_node_action_persistence(event_type: str, payload: dict):
         logger.info(f"Successfully persisted {len(persisted_nodes)} nodes and {len(persisted_edges)} edges for canvas {canvas_id}")
 
         broadcast_event(
-            group_name=f"canvas_{canvas_id}",
+            group_name=f"broadcast_global_group",
             event_type=RealtimeEventType.NODE_ACTION_PERSISTED,
             payload={
                 "status": ProcessStatus.SUCCESS.value.lower(),
@@ -161,7 +161,7 @@ def handle_node_action_persistence(event_type: str, payload: dict):
         logger.error(f"Failed to persist node action output for canvas {canvas_id}: {str(e)}")
 
         broadcast_event(
-            group_name=f"canvas_{canvas_id}",
+            group_name=f"broadcast_global_group",
             event_type=RealtimeEventType.NODE_ACTION_PERSISTED,
             payload={
                 "status": ProcessStatus.ERROR.value.lower(),

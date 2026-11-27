@@ -3,7 +3,7 @@ from uuid import UUID
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
-from realtime.constants import RealtimeEventType
+from realtime.constants import NotificationType
 
 
 def get_user_group_name(user_id: UUID) -> str:
@@ -29,7 +29,7 @@ def send_ws_notification(user_id: UUID, event_type: str, payload: dict):
         user_group_name,
         {
             # 'type' must match the consumer method (e.g., send_notification -> send_notification)
-            'type': 'send_notification',
+            'type': NotificationType.SEND_NOTIFICAYION,
             'event_type': event_type,
             'data': payload,
         }
@@ -48,8 +48,8 @@ def broadcast_event(group_name: str, event_type: str, payload: dict):
     async_to_sync(channel_layer.group_send)(
         group_name,
         {
-            'type': RealtimeEventType.BROADCAST_EVENT,
+            'type': NotificationType.BROADCAST_EVENT,
             'event_type': event_type,
-            'message': payload,
+            'data': payload,
         }
     )

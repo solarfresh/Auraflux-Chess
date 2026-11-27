@@ -16,6 +16,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         """
         Called when the WebSocket is handshaking as part of connection.
+        Supports joining multiple groups (e.g., user-specific group and a global broadcast group).
         """
         user = self.scope.get("user")
         if user is None:
@@ -26,27 +27,43 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         self.user_id = user.id
         self.user_group_name = get_user_group_name(self.user_id)
 
-        await self.channel_layer.group_add(
+        # Define multiple groups to join (user group + global broadcast group)
+        self.groups_to_join = [
             self.user_group_name,
-            self.channel_name
-        )
+            "broadcast_global_group"
+        ]
 
-        logger.info("User %s connected to WebSocket. Channel added to group %s.",
-                    self.user_id, self.user_group_name)
+        for group_name in self.groups_to_join:
+            await self.channel_layer.group_add(
+                group_name,
+                self.channel_name
+            )
+
+        logger.info("User %s connected to WebSocket. Channels added to groups: %s",
+                    self.user_id, self.groups_to_join)
         await self.accept()
 
     async def disconnect(self, close_code):
         """
         Called when the WebSocket closes for any reason.
+        Discards the connection from all joined groups.
         """
-        if hasattr(self, 'user_group_name'):
-            await self.channel_layer.group_discard(
-                self.user_group_name,
-                self.channel_name
-            )
-            logger.info("User %s disconnected from WebSocket.", self.user_id)
+        if hasattr(self, 'groups_to_join'):
+            for group_name in self.groups_to_join:
+                await self.channel_layer.group_discard(
+                    group_name,
+                    self.channel_name
+                )
+            logger.info("User %s disconnected from WebSocket. Discarded from groups: %s",
+                        getattr(self, 'user_id', 'Unknown'), self.groups_to_join)
 
-    # --- Communication Method (Generic Notification Handler) ---
+    # --- Communication Methods ---
+
+    async def broadcast_event(self, event):
+        """
+        Handles general broadcast messages sent to multiple channels/groups.
+        """
+        await self.send_notification(event)
 
     async def send_notification(self, event):
         """

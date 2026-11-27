@@ -115,6 +115,8 @@ class ImportEdgeCreateSerializer(serializers.ModelSerializer):
 
 class EdgeSerializer(serializers.ModelSerializer):
     type = serializers.CharField(source='edge_type')
+    source = serializers.CharField(source='source.id')
+    target = serializers.CharField(source='target.id')
     sourceHandle = serializers.CharField(source='source_handle', allow_blank=True, allow_null=True)
     targetHandle = serializers.CharField(source='target_handle', allow_blank=True, allow_null=True)
 
@@ -180,32 +182,65 @@ class CanvasGraphImportSerializer(serializers.Serializer):
         nodes_to_create = []
         temp_ids = []
 
+        # Check if any nodes have explicit IDs provided or already exist in the canvas
+        existing_nodes_map = {}
+        incoming_node_ids = []
+        for n_data in nodes_data:
+            node_id = n_data.get('id')
+            if node_id:
+                try:
+                    incoming_node_ids.append(uuid.UUID(str(node_id)))
+                except (ValueError, TypeError):
+                    pass
+
+        if incoming_node_ids:
+            existing_qs = Node.objects.filter(canvas=canvas, id__in=incoming_node_ids)
+            for node in existing_qs:
+                existing_nodes_map[str(node.id)] = node
+
+        persisted_nodes = []
         for index, n_data in enumerate(nodes_data):
             temp_id = n_data.pop('temp_id', None) or str(index)
-            temp_ids.append(temp_id)
+            node_id = n_data.get('id')
 
             position = n_data.pop('position')
             n_data['pos_x'] = position['x']
             n_data['pos_y'] = position['y']
-            nodes_to_create.append(Node(canvas=canvas, **n_data))
 
-        persisted_nodes = Node.objects.bulk_create(nodes_to_create)
+            if node_id and str(node_id) in existing_nodes_map:
+                # Node already exists, update it or use existing instance
+                existing_node = existing_nodes_map[str(node_id)]
+                for key, val in n_data.items():
+                    if key != 'id':
+                        setattr(existing_node, key, val)
+                existing_node.save()
+                persisted_nodes.append(existing_node)
+                created_nodes_map[str(temp_id)] = existing_node
+                created_nodes_map[str(node_id)] = existing_node
+            else:
+                nodes_to_create.append(Node(canvas=canvas, **n_data))
+                temp_ids.append((temp_id, node_id))
 
-        handles_to_create = []
-        for node in persisted_nodes:
-            for handle_type in HandleType:
-                for position in HandlePosition:
-                    handles_to_create.append(
-                        NodeHandle(
-                            node=node,
-                            handle_type=handle_type,
-                            position=position
+        if nodes_to_create:
+            new_persisted = Node.objects.bulk_create(nodes_to_create)
+            handles_to_create = []
+            for node in new_persisted:
+                for handle_type in HandleType:
+                    for position in HandlePosition:
+                        handles_to_create.append(
+                            NodeHandle(
+                                node=node,
+                                handle_type=handle_type,
+                                position=position
+                            )
                         )
-                    )
-        NodeHandle.objects.bulk_create(handles_to_create)
+            NodeHandle.objects.bulk_create(handles_to_create)
 
-        for temp_id, node in zip(temp_ids, persisted_nodes):
-            created_nodes_map[str(temp_id)] = node
+            for (temp_id, node_id), node in zip(temp_ids, new_persisted):
+                created_nodes_map[str(temp_id)] = node
+                persisted_nodes.append(node)
+                if node_id:
+                    created_nodes_map[str(node_id)] = node
 
         return created_nodes_map, persisted_nodes
 
