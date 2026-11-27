@@ -103,7 +103,7 @@ def handle_node_action_persistence(event_type: str, payload: dict):
         formatted_nodes.append({
             "temp_id": str(temp_id) if temp_id else None,
             "label": n_data.get('label', 'Untitled'),
-            "node_type": n_data.get('type', 'CONCEPT'),
+            "type": n_data.get('type', 'CONCEPT'),
             "position": n_data.get("position") or {"x": 0.0, "y": 0.0},
             "content": n_data.get('content', ''),
             "status": 'REVIEW',
@@ -115,7 +115,7 @@ def handle_node_action_persistence(event_type: str, payload: dict):
         formatted_edges.append({
             "source": str(e_data.get('source')),
             "target": str(e_data.get('target')),
-            "edge_type": e_data.get('type', 'LINK'),
+            "type": e_data.get('type', 'LINK'),
             "weight": e_data.get('weight', 1.0),
             "label": e_data.get('label', ''),
             "status": 'REVIEW',

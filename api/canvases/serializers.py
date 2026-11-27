@@ -47,12 +47,13 @@ class NodeSerializer(serializers.ModelSerializer):
 
 
 class NodeCreateSerializer(serializers.ModelSerializer):
+    type = serializers.CharField(source='node_type')
     position = serializers.DictField(write_only=True)
     temp_id = serializers.CharField(required=False, allow_blank=True, allow_null=True, write_only=True)
 
     class Meta:
         model = Node
-        fields = ['label', 'node_type', 'position', 'status', 'temp_id']
+        fields = ['label', 'type', 'position', 'content', 'status', 'rationale', 'temp_id']
 
     def create(self, validated_data):
         position = validated_data.pop('position')
@@ -87,6 +88,7 @@ class NodeUpdateSerializer(serializers.ModelSerializer):
 
 
 class EdgeCreateSerializer(serializers.ModelSerializer):
+    type = serializers.CharField(source='edge_type')
     source = serializers.PrimaryKeyRelatedField(queryset=Node.objects.all())
     target = serializers.PrimaryKeyRelatedField(queryset=Node.objects.all())
     sourceHandle = serializers.CharField(source='source_handle', required=False, allow_blank=True, allow_null=True)
@@ -94,10 +96,11 @@ class EdgeCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Edge
-        fields = ['source', 'target', 'edge_type', 'weight', 'status', 'label', 'evidence', 'rationale', 'metadata', 'sourceHandle', 'targetHandle']
+        fields = ['source', 'target', 'type', 'weight', 'status', 'label', 'evidence', 'rationale', 'metadata', 'sourceHandle', 'targetHandle']
 
 
 class ImportEdgeCreateSerializer(serializers.ModelSerializer):
+    type = serializers.CharField(source='edge_type')
     source = serializers.CharField()
     target = serializers.CharField()
     sourceHandle = serializers.CharField(source='source_handle', required=False, allow_blank=True, allow_null=True)
@@ -105,7 +108,7 @@ class ImportEdgeCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Edge
-        fields = ['source', 'target', 'edge_type', 'weight', 'status', 'label', 'evidence', 'rationale', 'metadata', 'sourceHandle', 'targetHandle']
+        fields = ['source', 'target', 'type', 'weight', 'status', 'label', 'evidence', 'rationale', 'metadata', 'sourceHandle', 'targetHandle']
 
     def validate(self, data):
         if not isinstance(data.get('source'), str) or not isinstance(data.get('target'), str):
