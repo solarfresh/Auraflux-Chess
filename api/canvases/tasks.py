@@ -36,6 +36,9 @@ def handle_node_action_request(event_type: str, payload: dict):
         logger.error(f"Invalid action type: {action_type}")
         return
 
+    task_id = handle_node_action_request.request.id
+    logger.info("Task %s: Handling node action request for node %s on canvas %s with action type %s.", task_id, node_id, canvas_id, action_type)
+
     try:
         node = Node.objects.get(id=node_id, canvas_id=canvas_id)
     except Node.DoesNotExist:
@@ -64,7 +67,8 @@ def handle_node_action_request(event_type: str, payload: dict):
         "next_event_payload": {
             "canvas_id": canvas_id,
             "session_id": session_id
-        }
+        },
+        "next_event_queue": NodeActionPersistence.queue
     }
 
     publish_event.delay(
@@ -84,9 +88,11 @@ def handle_node_action_persistence(event_type: str, payload: dict):
         logger.error("Missing canvas_id in NodeActionPersistence payload")
         return
 
-    result_data = agent_output.get('result', {})
-    nodes_data = result_data.get('nodes', {})
-    edges_data = result_data.get('edges', [])
+    task_id = handle_node_action_persistence.request.id
+    logger.info("Task %s: Handling node action persistence for canvas %s with session %s.", task_id, canvas_id, session_id)
+
+    nodes_data = agent_output.get('nodes', {})
+    edges_data = agent_output.get('edges', [])
 
     if isinstance(nodes_data, dict):
         nodes_data = list(nodes_data.values())
@@ -98,7 +104,7 @@ def handle_node_action_persistence(event_type: str, payload: dict):
             "temp_id": str(temp_id) if temp_id else None,
             "label": n_data.get('label', 'Untitled'),
             "node_type": n_data.get('type', 'CONCEPT'),
-            "position": n_data.get('position', {"x": 0.0, "y": 0.0}),
+            "position": n_data.get("position") or {"x": 0.0, "y": 0.0},
             "content": n_data.get('content', ''),
             "status": 'REVIEW',
             "rationale": n_data.get('rationale', '')
@@ -138,7 +144,7 @@ def handle_node_action_persistence(event_type: str, payload: dict):
         logger.info(f"Successfully persisted {len(persisted_nodes)} nodes and {len(persisted_edges)} edges for canvas {canvas_id}")
 
         broadcast_event(
-            group_name=f"canvas_{canvas_id}",
+            group_name=f"broadcast_global_group",
             event_type=RealtimeEventType.NODE_ACTION_PERSISTED,
             payload={
                 "status": ProcessStatus.SUCCESS.value.lower(),
@@ -155,7 +161,7 @@ def handle_node_action_persistence(event_type: str, payload: dict):
         logger.error(f"Failed to persist node action output for canvas {canvas_id}: {str(e)}")
 
         broadcast_event(
-            group_name=f"canvas_{canvas_id}",
+            group_name=f"broadcast_global_group",
             event_type=RealtimeEventType.NODE_ACTION_PERSISTED,
             payload={
                 "status": ProcessStatus.ERROR.value.lower(),

@@ -15,9 +15,9 @@ class EmbeddingRequest:
 
 class NodeActionRequest:
     name = "handle_node_action_request"
-    queue = Queue.AGENT
+    queue = Queue.CHESS
 
 
 class NodeActionPersistence:
     name = "handle_node_action_persistence"
-    queue = Queue.AGENT
+    queue = Queue.CHESS

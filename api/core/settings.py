@@ -260,7 +260,7 @@ SIMPLE_JWT = {
     'ALGORITHM': 'RS256',
 }
 
-CLIENT_ID = os.getenv('CLIENT_ID', 'mull')
+CLIENT_ID = os.getenv('CLIENT_ID', 'chess')
 CLIENT_SECRET = os.getenv('CLIENT_SECRET', '')
 AUTH_JWKS_URL = os.getenv('AUTH_JWKS_URL', 'http://localhost:8000/.well-known/jwks.json')
 

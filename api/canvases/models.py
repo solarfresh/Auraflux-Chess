@@ -36,7 +36,7 @@ class Edge(BaseModel):
     label = models.CharField(max_length=255, blank=True, null=True)
     edge_type = models.CharField(max_length=20, choices=EdgeType.choices, default=EdgeType.LINK)
     weight = models.FloatField(default=1.0)
-    status = models.CharField(max_length=20, choices=EntityStatus.choices)
+    status = models.CharField(max_length=20, choices=EntityStatus.choices, default=EntityStatus.DRAFT)
     evidence = models.TextField(blank=True, null=True)
     rationale = models.TextField(blank=True, null=True)
     metadata = models.JSONField(default=dict, blank=True)

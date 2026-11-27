@@ -5,9 +5,11 @@ from asgiref.sync import sync_to_async
 from core.utils import (create_serialized_data, execute_serializer_method,
                         get_serialized_data_by_id,
                         update_serialized_data_by_id)
+from core.constants import EntityStatus
 from django.core.cache import cache
 from django.db import transaction
 from django.http import Http404
+from iam.permissions import HasRequiredScope
 from messaging.constants import NodeActionRequest
 from messaging.tasks import publish_event
 from rest_framework import status
@@ -25,6 +27,13 @@ from .utils import update_node_positions_by_serializer
 
 
 class CanvasGraphAPIView(APIView):
+
+    permission_classes = [HasRequiredScope]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            self.required_scope = 'chess:read'
+
     async def get(self, request, canvasId):
         cache_key = f'canvas_graph_{canvasId}'
         data = await sync_to_async(cache.get)(cache_key)
@@ -47,6 +56,13 @@ class CanvasGraphAPIView(APIView):
 
 
 class CanvasBatchPositionUpdateAPIView(APIView):
+
+    permission_classes = [HasRequiredScope]
+
+    def get_permissions(self):
+        if self.request.method in ['PATCH']:
+            self.required_scope = 'chess:write'
+
     async def patch(self, request, canvasId):
         try:
             canvas = await sync_to_async(Canvas.objects.get)(pk=canvasId)
@@ -69,6 +85,13 @@ class CanvasBatchPositionUpdateAPIView(APIView):
 
 
 class NodeListView(APIView):
+
+    permission_classes = [HasRequiredScope]
+
+    def get_permissions(self):
+        if self.request.method in ['POST']:
+            self.required_scope = 'chess:write'
+
     async def post(self, request, canvasId):
         try:
             canvas = await sync_to_async(Canvas.objects.get)(pk=canvasId)
@@ -91,6 +114,13 @@ class NodeListView(APIView):
 
 
 class NodeDetailView(APIView):
+
+    permission_classes = [HasRequiredScope]
+
+    def get_permissions(self):
+        if self.request.method in ['PUT', 'DELETE']:
+            self.required_scope = 'chess:write'
+
     async def put(self, request, canvasId, nodeId):
         try:
             canvas = await sync_to_async(Canvas.objects.get)(pk=canvasId)
@@ -135,6 +165,13 @@ class NodeDetailView(APIView):
 
 
 class ReviewNodeDeleteView(APIView):
+
+    permission_classes = [HasRequiredScope]
+
+    def get_permissions(self):
+        if self.request.method in ['DELETE']:
+            self.required_scope = 'chess:write'
+
     async def delete(self, request, canvasId):
         try:
             canvas = await sync_to_async(Canvas.objects.get)(pk=canvasId)
@@ -157,6 +194,13 @@ class ReviewNodeDeleteView(APIView):
 
 
 class EdgeListView(APIView):
+
+    permission_classes = [HasRequiredScope]
+
+    def get_permissions(self):
+        if self.request.method in ['DELETE']:
+            self.required_scope = 'chess:write'
+
     async def post(self, request, canvasId):
         try:
             canvas = await sync_to_async(Canvas.objects.get)(pk=canvasId)
@@ -180,6 +224,13 @@ class EdgeListView(APIView):
 
 
 class EdgeDetailView(APIView):
+
+    permission_classes = [HasRequiredScope]
+
+    def get_permissions(self):
+        if self.request.method in ['PUT', 'DELETE']:
+            self.required_scope = 'chess:write'
+
     async def put(self, request, canvasId, edgeId):
         try:
             canvas = await sync_to_async(Canvas.objects.get)(pk=canvasId)
@@ -224,6 +275,13 @@ class EdgeDetailView(APIView):
 
 
 class NodeActionView(APIView):
+
+    permission_classes = [HasRequiredScope]
+
+    def get_permissions(self):
+        if self.request.method in ['POST']:
+            self.required_scope = 'chess:write'
+
     async def post(self, request, canvasId, nodeId):
         action_type = request.data.get('actionType')
         session_id = request.headers.get('X-Session-ID') or str(uuid.uuid4())
@@ -250,7 +308,7 @@ class NodeActionView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        if node.status != 'active':
+        if node.status != EntityStatus.ACTIVE:
             return Response(
                 {"error": "Node is not active", "code": "INVALID_STATUS"},
                 status=status.HTTP_400_BAD_REQUEST
